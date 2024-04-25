@@ -32,7 +32,8 @@ def train(args, dataloader, model):
             img_w = label["width"]
             img_h = label["height"]
             joints_3d = label["joints_3d"]
-            heatmaps = torch.Tensor([joint_to_heatmap((64, 48), (img_h[i], img_w[i]), joint) for i, joint in enumerate(joints_3d)])
+            heatmaps = [joint_to_heatmap((64, 48), (img_h[i], img_w[i]), joint)[0] for i, joint in enumerate(joints_3d)]
+            heatmaps = torch.Tensor(np.array(heatmaps))
             print(f"output shape: {output.shape}")
             print(f"heatmap shape: {heatmaps.shape}")
             return

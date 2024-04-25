@@ -6,6 +6,8 @@ import numpy as np
 
 from tqdm import tqdm
 from torch.utils.data import Dataset
+from utils.heatmap import joint_to_heatmap
+from utils.visualize import vis_joints, vis_bbox, vis_heatmap
 
 class HalpeDataset(Dataset):
     """
@@ -53,8 +55,15 @@ class HalpeDataset(Dataset):
 
         Returns
         -------
-        tuple[np.ndarray, torch.Tensor]
+        tuple[torch.Tensor, dict]
             image and annotations of the sample at the index
+            annotation = {
+                bbox, 
+                width, 
+                height, 
+                heatmaps, 
+                masks
+            }
         """
         img_path = self.images[index]['img_path']
         img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
@@ -72,10 +81,10 @@ class HalpeDataset(Dataset):
         # scales the image to the correct size
         scaled_img = cv2.resize(img, (target_w, target_h))
 
-        scaled_img = np.transpose(scaled_img, (2, 0, 1))  # C x H x W
-        scaled_img = torch.from_numpy(scaled_img).float()
-        if scaled_img.max() > 1:
-            scaled_img /= 255
+        # scaled_img = np.transpose(scaled_img, (2, 0, 1))  # C x H x W
+        # scaled_img = torch.from_numpy(scaled_img).float()
+        # if scaled_img.max() > 1:
+        #     scaled_img /= 255
 
         # scales the bbox
         x_min, y_min, x_max, y_max = bbox[0], bbox[1], bbox[2], bbox[3]
@@ -91,11 +100,24 @@ class HalpeDataset(Dataset):
                 joints_3d[i, 0, 0] = joints_3d[i, 0, 0] * scale_x
                 joints_3d[i, 1, 0] = joints_3d[i, 1, 0] * scale_y
 
+        # gets the heatmap and the mask of the joints
+        heatmaps, masks, combined_heatmap = joint_to_heatmap((64, 48), (target_h, target_w), joints_3d)
+
+        # visualization
+        outfolder = "/users/axing2/data/users/axing2/split_estimation/test"
+        cv2.imwrite(os.path.join(outfolder, "original.jpg"), scaled_img)
+        vis_joints(scaled_img.copy(), joints_3d, os.path.join(outfolder, "joints.jpg"))
+        vis_bbox(scaled_img.copy(), np.array([scale_x_min, scale_y_min, scale_x_max, scale_y_max]), os.path.join(outfolder, "bbox.jpg"))
+        vis_heatmap(scaled_img.copy(), combined_heatmap, os.path.join(outfolder, "heatmap.jpg"))
+
+        return
+
         scaled_label = {
             'bbox': (scale_x_min, scale_y_min, scale_x_max, scale_y_max),
             'width': target_w,
             'height': target_h,
-            'joints_3d': joints_3d
+            'heatmaps': torch.Tensor(heatmaps),
+            'masks': torch.Tensor(masks)
         }
 
         return scaled_img, scaled_label
