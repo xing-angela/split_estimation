@@ -64,112 +64,41 @@ class HalpeDataset(Dataset):
         label = self.labels[index]
         bbox = label['bbox']
         joints_3d = label['joints_3d']
-
-        ######################### vis ######################
-        p_color = [(0, 255, 255), (0, 191, 255), (0, 255, 102), (0, 77, 255), (0, 255, 0),  # Nose, LEye, REye, LEar, REar
-           (77, 255, 255), (77, 255, 204), (77, 204, 255), (191, 255, 77), (77, 191, 255), (191, 255, 77),  # LShoulder, RShoulder, LElbow, RElbow, LWrist, RWrist
-           (204, 77, 255), (77, 255, 204), (191, 77, 255), (77, 255, 191), (127, 77, 255), (77, 255, 127),  # LHip, RHip, LKnee, Rknee, LAnkle, RAnkle, Neck
-           (77, 255, 255), (0, 255, 255), (77, 204, 255),  # head, neck, shoulder
-           (0, 255, 255), (0, 191, 255), (0, 255, 102), (0, 77, 255), (0, 255, 0), (77, 255, 255)] # foot
-        part_line = {}
-        kp_x = joints_3d[:, 0, 0]
-        kp_y = joints_3d[:, 1, 0]
-        kp_scores = joints_3d[:, 0, 1]
-
-        # Draw keypoints
-        for n in range(kp_scores.shape[0]):
-            if kp_scores[n] <= 0.6:
-                continue
-            cor_x, cor_y = int(kp_x[n]), int(kp_y[n])
-            part_line[n] = (int(cor_x), int(cor_y))
-            if n < len(p_color):
-                cv2.circle(test_img, (int(cor_x), int(cor_y)), 2, p_color[n], -1)
-            else:
-                cv2.circle(test_img, (int(cor_x), int(cor_y)), 1, (255,255,255), 2)
-        cv2.imwrite("/users/axing2/data/users/axing2/split_estimation/test/test_img.jpg", test_img)
-        ############################################################
         
-        img_w, img_h, _ = img.shape
+        img_h, img_w, _ = img.shape
         target_w, target_h = self.img_size
         scale_x, scale_y = target_w / img_w, target_h / img_h
         
         # scales the image to the correct size
-        transform = np.array([[scale_x, 0.0, 0.0],
-                              [0.0, scale_y, 0.0]])
-        
-        scaled_img = cv2.warpAffine(img, transform, (target_w, target_h))
+        scaled_img = cv2.resize(img, (target_w, target_h))
 
-        # scaled_img = np.transpose(scaled_img, (2, 0, 1))  # C*H*W
-        # scaled_img = torch.from_numpy(scaled_img).float()
-        # if scaled_img.max() > 1:
-        #     scaled_img /= 255
+        scaled_img = np.transpose(scaled_img, (2, 0, 1))  # C x H x W
+        scaled_img = torch.from_numpy(scaled_img).float()
+        if scaled_img.max() > 1:
+            scaled_img /= 255
 
-        # scales the bbox such that the center remains
+        # scales the bbox
         x_min, y_min, x_max, y_max = bbox[0], bbox[1], bbox[2], bbox[3]
 
-        center_x = (x_max - x_min) / 2
-        center_y = (y_max - y_min) / 2
-
-        bbox_w = (x_max - x_min) * scale_x
-        bbox_h = (y_max - y_min) * scale_y
-
-        scale_x_min = center_x - (bbox_w / 2)
-        scale_y_min = center_y - (bbox_h / 2)
-        scale_x_max = scale_x_min + bbox_w
-        scale_y_max = scale_x_min + bbox_h
+        scale_x_min = x_min * scale_x
+        scale_y_min = y_min * scale_y
+        scale_x_max = x_max * scale_x
+        scale_y_max = y_max * scale_y
 
         # scales the joint points
         for i in range(self.num_joints):
             if joints_3d[i, 0, 1] > 0.0:
-                point = joints_3d[i, 0:2, 0]
-                scaled_point = np.array([point[0], point[1], 1.]).T
-                scaled_point = np.dot(transform, scaled_point)
-                joints_3d[i, 0:2, 0] = scaled_point
+                joints_3d[i, 0, 0] = joints_3d[i, 0, 0] * scale_x
+                joints_3d[i, 1, 0] = joints_3d[i, 1, 0] * scale_y
 
-        ######################### vis ######################
-        p_color = [(0, 255, 255), (0, 191, 255), (0, 255, 102), (0, 77, 255), (0, 255, 0),  # Nose, LEye, REye, LEar, REar
-           (77, 255, 255), (77, 255, 204), (77, 204, 255), (191, 255, 77), (77, 191, 255), (191, 255, 77),  # LShoulder, RShoulder, LElbow, RElbow, LWrist, RWrist
-           (204, 77, 255), (77, 255, 204), (191, 77, 255), (77, 255, 191), (127, 77, 255), (77, 255, 127),  # LHip, RHip, LKnee, Rknee, LAnkle, RAnkle, Neck
-           (77, 255, 255), (0, 255, 255), (77, 204, 255),  # head, neck, shoulder
-           (0, 255, 255), (0, 191, 255), (0, 255, 102), (0, 77, 255), (0, 255, 0), (77, 255, 255)] # foot
-        part_line = {}
-        kp_x = joints_3d[:, 0, 0]
-        kp_y = joints_3d[:, 1, 0]
-        kp_scores = joints_3d[:, 0, 1]
-        # scaled_img = scaled_img.numpy()
+        scaled_label = {
+            'bbox': (scale_x_min, scale_y_min, scale_x_max, scale_y_max),
+            'width': target_w,
+            'height': target_h,
+            'joints_3d': joints_3d
+        }
 
-        # Draw keypoints
-        for n in range(kp_scores.shape[0]):
-            if kp_scores[n] <= 0.6:
-                continue
-            cor_x, cor_y = int(kp_x[n]), int(kp_y[n])
-            part_line[n] = (int(cor_x), int(cor_y))
-            if n < len(p_color):
-                cv2.circle(scaled_img, (int(cor_x), int(cor_y)), 2, p_color[n], -1)
-            else:
-                cv2.circle(scaled_img, (int(cor_x), int(cor_y)), 1, (255,255,255), 2)
-        # Draw limbs
-        # for i, (start_p, end_p) in enumerate(l_pair):
-        #     if start_p in part_line and end_p in part_line:
-        #         start_xy = part_line[start_p]
-        #         end_xy = part_line[end_p]
-        #         if i < len(line_color):
-        #             cv2.line(scaled_img, start_xy, end_xy, line_color[i], 2)
-        #         else:
-        #             cv2.line(scaled_img, start_xy, end_xy, (255,255,255), 1)
-
-        cv2.imwrite("/users/axing2/data/users/axing2/split_estimation/test/test_scaled_img.jpg", scaled_img)
-
-        return
-
-        # scaled_label = {
-        #     'bbox': (scale_x_min, scale_y_min, scale_x_max, scale_y_max),
-        #     'width': target_w,
-        #     'height': target_h,
-        #     'joints_3d': joints_3d
-        # }
-
-        # return scaled_img, scaled_label
+        return scaled_img, scaled_label
 
     
     def __len__(self):
