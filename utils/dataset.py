@@ -108,7 +108,10 @@ class HalpeDataset(Dataset):
         cv2.imwrite(os.path.join(outfolder, "original.jpg"), scaled_img)
         vis_joints(scaled_img.copy(), joints_3d, os.path.join(outfolder, "joints.jpg"))
         vis_bbox(scaled_img.copy(), np.array([scale_x_min, scale_y_min, scale_x_max, scale_y_max]), os.path.join(outfolder, "bbox.jpg"))
-        vis_heatmap(scaled_img.copy(), combined_heatmap, os.path.join(outfolder, "heatmap.jpg"))
+        for i in range(len(heatmaps)):
+            heatmap = heatmaps[i]
+            vis_heatmap(scaled_img.copy(), heatmap, os.path.join(outfolder, f"heatmap_{i}.jpg"))
+        vis_heatmap(scaled_img.copy(), combined_heatmap, os.path.join(outfolder, f"heatmap_combined.jpg"))
 
         return
 

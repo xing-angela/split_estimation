@@ -125,9 +125,8 @@ def vis_heatmap(image: np.ndarray, heatmap: np.ndarray, output_path):
     output_path: str
         the path to save the image
     """
-    print(heatmap)
-    heatmap = heatmap.astype('uint8')
-    heatmap_img = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    heatmap = heatmap / heatmap.max()
+    heatmap_img = cv2.applyColorMap(np.uint8(255 * heatmap), cv2.COLORMAP_JET)
     super_imposed_img = cv2.addWeighted(heatmap_img, 0.5, image, 0.5, 0)
 
     cv2.imwrite(output_path, super_imposed_img)
