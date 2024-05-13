@@ -6,8 +6,12 @@ import numpy as np
 
 from tqdm import tqdm
 from torch.utils.data import Dataset
+from utils.augment import augment_data
 from utils.heatmap import joint_to_heatmap
 from utils.visualize import vis_joints, vis_bbox, vis_heatmap
+
+JOINT_PAIRS = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12], [13, 14], [15, 16],
+               [20, 21], [22, 23], [24, 25]]
 
 class HalpeDataset(Dataset):
     """
@@ -16,17 +20,17 @@ class HalpeDataset(Dataset):
     """
     num_joints = 26
     
-    def __init__(self, data_dir: str, img_dir: str, img_size: (int, int)):
+    def __init__(self, data_dir, img_dir, img_size):
         """
         Initializes the Halpe Dataset
 
         Parameters
         ----------
-        data_dir: string
+        data_dir: str
             path of the data directory
-        img_dir: string
+        img_dir: str
             path of image directory within the data directory
-        img_size: string
+        img_size: str
             target size of images after scaling
         images: list
             a list of {img_path, img_id}
@@ -44,7 +48,7 @@ class HalpeDataset(Dataset):
         self.labels = data[1]
 
     
-    def __getitem__(self, index: int):
+    def __getitem__(self, index):
         """
         Returns the image and annotations of the dataset at the specific index
 
@@ -55,7 +59,7 @@ class HalpeDataset(Dataset):
 
         Returns
         -------
-        tuple[torch.Tensor, dict]
+        (torch.Tensor, dict)
             image and annotations of the sample at the index
             annotation = {
                 bbox, 
@@ -68,8 +72,6 @@ class HalpeDataset(Dataset):
         img_path = self.images[index]['img_path']
         img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
 
-        test_img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
-
         label = self.labels[index]
         bbox = label['bbox']
         joints_3d = label['joints_3d']
@@ -81,11 +83,6 @@ class HalpeDataset(Dataset):
         # scales the image to the correct size
         scaled_img = cv2.resize(img, (target_w, target_h))
 
-        # scaled_img = np.transpose(scaled_img, (2, 0, 1))  # C x H x W
-        # scaled_img = torch.from_numpy(scaled_img).float()
-        # if scaled_img.max() > 1:
-        #     scaled_img /= 255
-
         # scales the bbox
         x_min, y_min, x_max, y_max = bbox[0], bbox[1], bbox[2], bbox[3]
 
@@ -94,36 +91,59 @@ class HalpeDataset(Dataset):
         scale_x_max = x_max * scale_x
         scale_y_max = y_max * scale_y
 
+        scaled_bbox = [scale_x_min, scale_y_min, scale_x_max, scale_y_max]
+
         # scales the joint points
+        scaled_joints = joints_3d.copy()
         for i in range(self.num_joints):
-            if joints_3d[i, 0, 1] > 0.0:
-                joints_3d[i, 0, 0] = joints_3d[i, 0, 0] * scale_x
-                joints_3d[i, 1, 0] = joints_3d[i, 1, 0] * scale_y
+            if scaled_joints[i, 0, 1] > 0.0:
+                scaled_joints[i, 0, 0] = scaled_joints[i, 0, 0] * scale_x
+                scaled_joints[i, 1, 0] = scaled_joints[i, 1, 0] * scale_y
 
-        # gets the heatmap and the mask of the joints
-        heatmaps, masks, combined_heatmap = joint_to_heatmap((64, 48), (target_h, target_w), joints_3d)
-
-        # visualization
-        outfolder = "/users/axing2/data/users/axing2/split_estimation/test"
-        cv2.imwrite(os.path.join(outfolder, "original.jpg"), scaled_img)
-        vis_joints(scaled_img.copy(), joints_3d, os.path.join(outfolder, "joints.jpg"))
-        vis_bbox(scaled_img.copy(), np.array([scale_x_min, scale_y_min, scale_x_max, scale_y_max]), os.path.join(outfolder, "bbox.jpg"))
-        for i in range(len(heatmaps)):
-            heatmap = heatmaps[i]
-            vis_heatmap(scaled_img.copy(), heatmap, os.path.join(outfolder, f"heatmap_{i}.jpg"))
-        vis_heatmap(scaled_img.copy(), combined_heatmap, os.path.join(outfolder, f"heatmap_combined.jpg"))
-
-        return
-
-        scaled_label = {
-            'bbox': (scale_x_min, scale_y_min, scale_x_max, scale_y_max),
+        # further augments the data
+        scale_label = {
+            'bbox': scaled_bbox,
             'width': target_w,
             'height': target_h,
+            'joints_3d': scaled_joints
+        }
+        aug_img, aug_label = augment_data(scaled_img, scale_label, JOINT_PAIRS, True)
+        aug_h, aug_w = aug_label['height'], aug_label['width']
+        aug_bbox = aug_label['bbox']
+        aug_joints = aug_label['joints_3d']
+
+        # ensures the augmented image is the right shape and converts to tensor
+        aug_img = np.transpose(aug_img, (2, 0, 1))  # C x H x W
+        aug_img = torch.from_numpy(aug_img).float()
+        if aug_img.max() > 1:
+            aug_img /= 255
+
+        # gets the heatmap and the mask of the joints
+        # heatmaps, masks, combined_heatmap = joint_to_heatmap((64, 48), (aug_h, aug_w), aug_joints)
+        heatmaps, masks, combined_heatmap = joint_to_heatmap((32, 24), (aug_h, aug_w), aug_joints, sigma=3)
+
+        # visualization
+        # if flip and rotate:
+        #     print("flip and rotate")
+        #     outfolder = "/users/axing2/data/users/axing2/split_estimation/test_aug"
+        #     cv2.imwrite(os.path.join(outfolder, "non_aug.jpg"), scaled_img)
+        #     cv2.imwrite(os.path.join(outfolder, "original.jpg"), aug_img)
+        #     vis_joints(aug_img.copy(), aug_joints, os.path.join(outfolder, "joints.jpg"))
+        #     vis_bbox(aug_img.copy(), aug_bbox, os.path.join(outfolder, "bbox.jpg"))
+        # for i in range(len(heatmaps)):
+        #     heatmap = heatmaps[i]
+        #     vis_heatmap(scaled_img.copy(), heatmap, os.path.join(outfolder, f"heatmap_{i}.jpg"))
+        # vis_heatmap(aug_img.copy(), combined_heatmap, os.path.join(outfolder, f"heatmap_combined.jpg"))
+
+        aug_label = {
+            'bbox': aug_bbox,
+            'width': aug_w,
+            'height': aug_h,
             'heatmaps': torch.Tensor(heatmaps),
             'masks': torch.Tensor(masks)
         }
 
-        return scaled_img, scaled_label
+        return aug_img, aug_label
 
     
     def __len__(self):
