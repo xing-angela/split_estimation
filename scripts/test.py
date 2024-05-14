@@ -37,6 +37,7 @@ def parse_args():
     parser.add_argument("--output_path", required=True, type=str, help="Path to output the testing results")
     parser.add_argument("--checkpoint", required=True, type=str, help="Name of the checkpoint file")
     parser.add_argument("--train_dataset", choices=["Halpe26", "LSP"], default="Halpe26", help="Name of the data used for training")
+    parser.add_argument("--save_joints", action="store_true", help="Whether to store the joint keypoints")
 
     return parser.parse_args()
 
@@ -105,7 +106,7 @@ def get_mp_bbox(img):
                 largest_width = person.bounding_box.width
                 person_id = i
 
-        bbox = detection_result.detections[person_id].bounding_box
+        bbox = detection_result.detections[0].bounding_box
         x_origin = bbox.origin_x + (bbox.width / 2)
         y_origin = bbox.origin_y + (bbox.height / 2)
 
@@ -189,6 +190,7 @@ def main():
 
             joints = heatmap_to_joint(heatmap, cropped_img.shape[:2])
 
+            # visualizes the joint keypoints
             output_path = os.path.join(args.output_path, img_name)
             output_img = cv2.cvtColor(cropped_img, cv2.COLOR_BGR2RGB)
 
@@ -196,6 +198,19 @@ def main():
                 vis_joints(output_img, joints, HALPE_JOINT_PAIRS, output_path)
             else:
                 vis_joints(output_img, joints, LSP_JOINT_PAIRS, output_path)
+
+            # stores the joint keypoints
+            if args.save_joints:
+                kp_x = joints[:, 0, 0]
+                kp_y = joints[:, 1, 0]
+
+                keypoints = np.column_stack((kp_x, kp_y))
+
+                basename = img_name.split(".")[0]
+
+                file = os.path.join(args.output_path, basename)
+                np.save(file, keypoints)
+
 
 if __name__ == "__main__":
     main()

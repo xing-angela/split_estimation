@@ -6,13 +6,11 @@ from tqdm import tqdm
 from models.unipose import UniPose
 from argparse import ArgumentParser
 from models.fast_pose import FastPose
-from dataset.lsp_dataset import LSPDataset
-from dataset.halpe_dataset import HalpeDataset
 from torch.utils.data import DataLoader
 from utils.accuracy import calc_accuracy
-from utils.heatmap import joint_to_heatmap
+from dataset.lsp_dataset import LSPDataset
 from utils.visualize import vis_loss, vis_acc
-from torchsummary import summary
+from dataset.halpe_dataset import HalpeDataset
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -31,6 +29,7 @@ def parse_args():
     parser.add_argument("--dataset", choices=["Halpe26", "LSP"], default="Halpe26", help="Name of the data used for training")
     parser.add_argument("--batch_size", default=48, type=int, help="Batch size")
     parser.add_argument("--num_epochs", default=200, type=int, help="Number of epochs")
+    parser.add_argument("--learning_rate", default=0.001, help="Learning Rate")
 
     parser.add_argument("--img_width", default=256, type=int, help="Size of the image width")
     parser.add_argument("--img_height", default=192, type=int, help="Size of the image height")
@@ -200,7 +199,7 @@ def main():
 
     # MSE loss and Adam optimizer
     loss_function = nn.MSELoss().cuda()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
 
     # train
     loss = train(args, train_dataloader, model, loss_function, optimizer, start_epoch, end_epoch)
