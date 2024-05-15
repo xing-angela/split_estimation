@@ -1,5 +1,5 @@
 IMG_DIR="data/ap_test"
-# OUT_DIR="result/lsp/fuck"
+# OUT_DIR="result/lsp/"
 # CHECKPOINT="exp/lsp_data/model_145.pth"
 # TRAIN_DATASET="LSP"
 OUT_DIR="result/halpe"
