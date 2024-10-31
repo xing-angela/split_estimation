@@ -1,5 +1,5 @@
 # Split Estimation
-This repo contains the code for calculating the angle of splits given an image of a gymnast. The repo implements the FastPose model from [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) and the [UniPose](https://github.com/bmartacho/UniPose) model (does not work lol). 
+This repo contains the code for calculating the angle of splits given an image of a gymnast. The repo implements the FastPose model from [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose). 
 
 ## Environment Requirements
 I used a Python environment with CUDA 11.8 and Pytorch 2.1.0. 
@@ -28,3 +28,6 @@ Split Estimation Repo
 
 ## Pretrained Models
 The FastPose model trained on the Halpe-FullBody dataset with 26 joint keypoints can be found [here](https://drive.google.com/file/d/1ek66o0_Ivk_9-KfD9qfdwohEnk5rK0B6/view?usp=sharing). The FastPose model trained on the LSP extended dataset can be found here [here](https://drive.google.com/file/d/1Q37oh2hLQsA_DXImmwq1herQ3xJJBAb4/view?usp=sharing). 
+
+## Results
+![split result](./assets/result.png)
